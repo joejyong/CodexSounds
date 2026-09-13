@@ -64,7 +64,7 @@ jobs:
         run: .\scripts\Package-Release.ps1 -Version $env:RELEASE_VERSION
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: codex-sounds-${{ env.RELEASE_VERSION }}-windows-x64
           path: |
