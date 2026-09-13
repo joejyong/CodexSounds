@@ -16,7 +16,8 @@ import { z } from "zod/v3";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
 const SETTINGS_URI = "ui://codex-sounds/settings-v1.html";
 const CODEX_HOME = resolve(process.env.CODEX_HOME || join(homedir(), ".codex"));
-const HELPER = join(ROOT, "bin", "codex-sounds", "codex-sounds.exe");
+const HELPER = resolve(process.env.CODEX_SOUNDS_HELPER ||
+  join(ROOT, "bin", "codex-sounds", "codex-sounds.exe"));
 const ROUTES = [
   "settings",
   "preview",

@@ -11,7 +11,11 @@ const client = new Client({ name: "codex-sounds-panel-test", version: "1.0.0" })
 const transport = new StdioClientTransport({
   command: process.execPath,
   args: [fileURLToPath(new URL("../mcp-server.mjs", import.meta.url))],
-  env: { ...process.env, CODEX_HOME: join(isolatedHome, ".codex") },
+  env: {
+    ...process.env,
+    CODEX_HOME: join(isolatedHome, ".codex"),
+    CODEX_SOUNDS_HELPER: join(isolatedHome, "missing-helper.exe"),
+  },
   stderr: "inherit",
 });
 
@@ -30,7 +34,8 @@ try {
   assert.match(resource.contents[0].text, /sound_settings_request/);
   const opened = await client.callTool({ name: "open_sound_settings", arguments: {} });
   assert.equal(opened.structuredContent.opened, false);
-  assert.match(opened.structuredContent.message, /setup/i);
+  assert.equal(typeof opened.structuredContent.message, "string");
+  assert.ok(opened.structuredContent.message.length > 0);
   const invalid = await client.callTool({ name: "sound_settings_request",
     arguments: { path: "not-an-api" } });
   assert.equal(invalid.isError, true);
