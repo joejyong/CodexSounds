@@ -26,7 +26,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          # PyInstaller cannot currently collect Tcl/Tk from the zipfs layout in
+          # the GitHub runner's Python 3.14 distribution.
+          python-version: "3.13"
 
       - name: Check the release version
         shell: pwsh
