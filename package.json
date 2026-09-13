@@ -1,0 +1,16 @@
+{
+  "name": "codex-sounds-panel",
+  "version": "1.3.1",
+  "private": true,
+  "type": "module",
+  "description": "Codex right-panel entrypoint for local Codex Sounds settings.",
+  "scripts": {
+    "check": "node --check mcp-server.mjs",
+    "test": "node scripts/panel.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+.venv/
+outputs/
+work/
+dist/
+build/
+__pycache__/
+*.py[cod]
+.pytest_cache/

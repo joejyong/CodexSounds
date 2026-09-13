@@ -1,0 +1,28 @@
+{
+  "name": "codex-sounds",
+  "version": "1.3.1+codex.20260913103441",
+  "description": "Custom reply sounds, project soundscapes, and authorised YouTube-to-MP3 imports on Windows.",
+  "author": {
+    "name": "Joe Yong"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Codex Sounds",
+    "shortDescription": "Reply sounds and project-specific ambient audio.",
+    "longDescription": "Play a sound after each Codex reply and assign looped WAV or MP3 tracks or folder playlists to Codex projects. Import authorised audio from a queue of YouTube URLs with local yt-dlp and FFmpeg tools. One controller owns the media handle, releases it when Codex closes, and supports a global mute shortcut. Windows x64. Audio paths and settings stay local to each workstation.",
+    "developerName": "Joe Yong",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Open my sound settings in Codex.",
+      "Set up reply sounds on this workstation.",
+      "Mute my reply sounds.",
+      "Assign a soundscape to this project.",
+      "Import authorised ambient audio from YouTube URLs."
+    ]
+  }
+}
