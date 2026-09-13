@@ -41,7 +41,8 @@ class CompletionFilterTests(unittest.TestCase):
 
     def invoke(self, event, allow=True):
         with patch.object(notify, 'select_sound', return_value=('chime', Path('chime.wav'))) as select, \
-             patch.object(notify, 'play_sound', return_value=True) as play:
+             patch.object(notify, 'play_sound', return_value=True) as play, \
+             patch.object(notify, 'system_volume_scalar', return_value=1.0):
             notify.main(json.dumps(event), allow_sound=allow)
             report = json.loads((self.data / 'last-event.json').read_text())
             return report, select.call_count, play.call_count

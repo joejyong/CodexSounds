@@ -21,6 +21,109 @@ _winmm.mciSendStringW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.UI
 _winmm.mciSendStringW.restype = wintypes.DWORD
 _winmm.mciGetErrorStringW.argtypes = [wintypes.DWORD, wintypes.LPWSTR, wintypes.UINT]
 _winmm.mciGetErrorStringW.restype = wintypes.BOOL
+_ole32 = ctypes.WinDLL('ole32')
+
+
+class GUID(ctypes.Structure):
+    _fields_ = [('Data1', wintypes.DWORD), ('Data2', wintypes.WORD),
+                ('Data3', wintypes.WORD), ('Data4', ctypes.c_ubyte * 8)]
+
+    @classmethod
+    def from_string(cls, value):
+        data = uuid.UUID(value).bytes_le
+        return cls(int.from_bytes(data[:4], 'little'), int.from_bytes(data[4:6], 'little'),
+                   int.from_bytes(data[6:8], 'little'), (ctypes.c_ubyte * 8)(*data[8:]))
+
+
+CLSID_MMDEVICE_ENUMERATOR = GUID.from_string('bcde0395-e52f-467c-8e3d-c4579291692e')
+IID_IMMDEVICE_ENUMERATOR = GUID.from_string('a95664d2-9614-4f35-a746-de8db63617e6')
+IID_IAUDIO_ENDPOINT_VOLUME = GUID.from_string('5cdf2c82-841e-4546-9722-0cf74078229a')
+CLSCTX_ALL = 23
+COINIT_APARTMENTTHREADED = 0x2
+RPC_E_CHANGED_MODE = -2147417850
+E_RENDER = 0
+E_MULTIMEDIA = 1
+
+_ole32.CoInitializeEx.argtypes = [ctypes.c_void_p, wintypes.DWORD]
+_ole32.CoInitializeEx.restype = ctypes.c_long
+_ole32.CoUninitialize.argtypes = []
+_ole32.CoUninitialize.restype = None
+_ole32.CoCreateInstance.argtypes = [ctypes.POINTER(GUID), ctypes.c_void_p, wintypes.DWORD,
+                                    ctypes.POINTER(GUID), ctypes.POINTER(ctypes.c_void_p)]
+_ole32.CoCreateInstance.restype = ctypes.c_long
+
+
+def _check_hresult(result):
+    if result < 0:
+        raise OSError(result, 'Windows Core Audio request failed')
+
+
+def _com_method(interface, index, result_type, *argument_types):
+    table = ctypes.cast(interface, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+    return ctypes.WINFUNCTYPE(result_type, ctypes.c_void_p, *argument_types)(table[index])
+
+
+def _release_com(interface):
+    if interface:
+        _com_method(interface, 2, wintypes.ULONG)(interface)
+
+
+def _read_system_volume_scalar():
+    """Read the default multimedia output's master volume and mute state."""
+    initialized = _ole32.CoInitializeEx(None, COINIT_APARTMENTTHREADED)
+    if initialized < 0 and initialized != RPC_E_CHANGED_MODE:
+        _check_hresult(initialized)
+    enumerator = ctypes.c_void_p()
+    endpoint = ctypes.c_void_p()
+    endpoint_volume = ctypes.c_void_p()
+    try:
+        _check_hresult(_ole32.CoCreateInstance(
+            ctypes.byref(CLSID_MMDEVICE_ENUMERATOR), None, CLSCTX_ALL,
+            ctypes.byref(IID_IMMDEVICE_ENUMERATOR), ctypes.byref(enumerator)))
+        get_default_endpoint = _com_method(
+            enumerator, 4, ctypes.c_long, ctypes.c_int, ctypes.c_int,
+            ctypes.POINTER(ctypes.c_void_p))
+        _check_hresult(get_default_endpoint(
+            enumerator, E_RENDER, E_MULTIMEDIA, ctypes.byref(endpoint)))
+        activate = _com_method(
+            endpoint, 3, ctypes.c_long, ctypes.POINTER(GUID), wintypes.DWORD,
+            ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))
+        _check_hresult(activate(
+            endpoint, ctypes.byref(IID_IAUDIO_ENDPOINT_VOLUME), CLSCTX_ALL, None,
+            ctypes.byref(endpoint_volume)))
+        level = ctypes.c_float()
+        get_master_level = _com_method(
+            endpoint_volume, 9, ctypes.c_long, ctypes.POINTER(ctypes.c_float))
+        _check_hresult(get_master_level(endpoint_volume, ctypes.byref(level)))
+        muted = wintypes.BOOL()
+        get_mute = _com_method(
+            endpoint_volume, 15, ctypes.c_long, ctypes.POINTER(wintypes.BOOL))
+        _check_hresult(get_mute(endpoint_volume, ctypes.byref(muted)))
+        return 0.0 if muted.value else max(0.0, min(1.0, float(level.value)))
+    finally:
+        _release_com(endpoint_volume)
+        _release_com(endpoint)
+        _release_com(enumerator)
+        if initialized >= 0:
+            _ole32.CoUninitialize()
+
+
+def system_volume_scalar():
+    """Return 1.0 if Windows cannot report the default output's master level."""
+    try:
+        return _read_system_volume_scalar()
+    except (OSError, ValueError):
+        return 1.0
+
+
+def effective_volume(volume, system_scalar=None):
+    validate_volume(volume)
+    if system_scalar is None:
+        system_scalar = system_volume_scalar()
+    if isinstance(system_scalar, bool) or not isinstance(system_scalar, (int, float)):
+        raise ValueError('System volume must be between 0 and 1')
+    system_scalar = max(0.0, min(1.0, system_scalar))
+    return volume * system_scalar
 
 
 def validate_volume(volume):
@@ -96,13 +199,12 @@ def sound_bytes(path, volume):
     return output.getvalue()
 
 
-def play_sound(path, volume=100):
-    validate_volume(volume)
+def play_sound(path, volume=100, system_scalar=None):
+    volume = effective_volume(volume, system_scalar)
     if Path(path).suffix.lower() == '.mp3':
         with mp3_device(path) as alias:
             if volume == 0:
                 return False
-            # Volume belongs to this opened audio device, not the system mixer.
             mci(f'setaudio {alias} volume to {round(volume * 10)}')
             mci(f'play {alias} from 0 wait')
         return True
@@ -270,17 +372,21 @@ def main(payload, allow_sound=True):
                 report['suppressed'] = 'duplicate-completion'
             else:
                 volume = config.get("volume", 100)
+                system_scalar = system_volume_scalar()
+                adjusted_volume = effective_volume(volume, system_scalar)
                 machine = os.environ.get("COMPUTERNAME", "")
                 try:
-                    name, path = select_sound(config, machine, advance=volume > 0)
+                    name, path = select_sound(config, machine, advance=adjusted_volume > 0)
                 except Exception:
                     if config.get('playbackMode') != 'folder':
                         raise
                     report['folderFallback'] = True
                     name, path = select_sound({**config, 'playbackMode': 'single'}, machine)
-                played = play_sound(path, volume)
+                played = play_sound(path, volume, system_scalar)
                 report["sound"] = name
                 report["volume"] = volume
+                report["systemVolume"] = round(system_scalar * 100)
+                report["effectiveVolume"] = round(adjusted_volume, 2)
                 report["playbackAccepted"] = played
         else:
             report['suppressed'] = 'not-complete'

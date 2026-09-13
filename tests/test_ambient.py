@@ -5,7 +5,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 import ambient
@@ -21,7 +21,7 @@ class AmbientTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_active_workspace_wins_when_selected_project_is_stale(self):
+    def test_selected_project_wins_when_workspace_roots_are_stale(self):
         state = {
             'local-projects': {
                 'b': {'id': 'b', 'name': 'Zulu', 'rootPaths': ['C:\\Zulu']},
@@ -33,7 +33,7 @@ class AmbientTests(unittest.TestCase):
         (self.root / '.codex-global-state.json').write_text(json.dumps(state), encoding='utf-8')
         projects, selected = ambient.project_snapshot(self.root)
         self.assertEqual([project['id'] for project in projects], ['a', 'b'])
-        self.assertEqual(selected, 'b')
+        self.assertEqual(selected, 'a')
 
     def test_bundle_publish_retries_a_temporary_windows_lock(self):
         staging = self.root / 'staging'
@@ -45,18 +45,17 @@ class AmbientTests(unittest.TestCase):
         self.assertEqual(replace.call_count, 2)
         sleep.assert_called_once_with(0.1)
 
-    def test_no_active_workspace_stays_silent_even_with_selected_project(self):
+    def test_selected_project_does_not_require_legacy_workspace_roots(self):
         state = {'local-projects': {'a': {'id': 'a', 'name': 'Alpha', 'rootPaths': ['C:\\Alpha']}},
                  'selected-project': {'type': 'local', 'projectId': 'a'},
                  'active-workspace-roots': []}
         (self.root / '.codex-global-state.json').write_text(json.dumps(state), encoding='utf-8')
-        self.assertIsNone(ambient.project_snapshot(self.root)[1])
+        self.assertEqual(ambient.project_snapshot(self.root)[1], 'a')
 
-    def test_projectless_workspace_stays_silent_instead_of_using_stale_project(self):
+    def test_projectless_selection_stays_silent_with_stale_workspace_roots(self):
         state = {'local-projects': {'a': {'id': 'a', 'name': 'Alpha', 'rootPaths': ['C:\\Alpha']}},
-                 'selected-project': {'type': 'local', 'projectId': 'a'},
-                 'active-workspace-roots': ['C:\\Standalone'],
-                 'thread-projectless-output-directories': {'thread': 'C:\\Standalone'}}
+                 'selected-project': None,
+                 'active-workspace-roots': ['C:\\Alpha']}
         (self.root / '.codex-global-state.json').write_text(json.dumps(state), encoding='utf-8')
         self.assertIsNone(ambient.project_snapshot(self.root)[1])
 
@@ -66,6 +65,58 @@ class AmbientTests(unittest.TestCase):
                  'active-workspace-roots': ['C:\\Worktrees\\Alpha-feature']}
         (self.root / '.codex-global-state.json').write_text(json.dumps(state), encoding='utf-8')
         self.assertEqual(ambient.project_snapshot(self.root)[1], 'a')
+
+    def test_remote_invalid_and_unknown_selections_do_not_use_stale_roots(self):
+        projects = [{'id': 'a', 'rootPaths': [r'C:\Alpha']}]
+        for selection in ({'type': 'remote', 'projectId': 'a'}, {},
+                          {'type': 'local', 'projectId': 'removed'},
+                          {'type': 'local', 'projectId': []}, 'invalid'):
+            with self.subTest(selection=selection):
+                self.assertIsNone(ambient.active_project_id({
+                    'selected-project': selection,
+                    'active-workspace-roots': [r'C:\Alpha'],
+                }, projects))
+
+    def test_legacy_roots_require_one_unambiguous_project(self):
+        projects = [{'id': 'a', 'rootPaths': [r'C:\Alpha']}]
+        state = {'active-workspace-roots': [r'C:\Alpha']}
+        self.assertEqual(ambient.active_project_id(state, projects), 'a')
+        self.assertIsNone(ambient.active_project_id(state, projects + [
+            {'id': 'b', 'rootPaths': [r'C:\Alpha']},
+        ]))
+        state['thread-projectless-output-directories'] = {'task': r'C:\Alpha'}
+        self.assertIsNone(ambient.active_project_id(state, projects))
+
+    def test_switch_to_unassigned_projects_and_back_pauses_and_resumes(self):
+        projects = {
+            'sounds': {'id': 'sounds', 'name': 'Sounds', 'rootPaths': [r'C:\Sounds']},
+            'thinking': {'id': 'thinking', 'name': 'Thinking', 'rootPaths': [r'C:\Thinking']},
+            'tts': {'id': 'tts', 'name': 'TTS', 'rootPaths': [r'C:\TTS']},
+        }
+        state = {'local-projects': projects, 'active-workspace-roots': [r'C:\Sounds']}
+        settings = {'enabled': True, 'muted': False, 'volume': 20,
+                    'assignments': {'sounds': {'mode': 'single', 'file': str(self.root / 'rain.mp3')}}}
+        (self.root / 'rain.mp3').write_bytes(b'placeholder')
+        track = Mock(path=self.root / 'rain.mp3')
+        track.mode.return_value = 'playing'
+        track.position.return_value = 12345
+        track.pause.side_effect = lambda: setattr(track.mode, 'return_value', 'paused')
+        track.resume.side_effect = lambda: setattr(track.mode, 'return_value', 'playing')
+        controller = ambient.AmbientController(self.root)
+        controller.store = ambient.PositionStore(self.root / 'positions.sqlite')
+        with patch.object(ambient, 'codex_desktop_is_running', return_value=True), \
+             patch.object(ambient, 'plugin_is_enabled', return_value=True), \
+             patch.object(ambient, 'MediaTrack', return_value=track) as media:
+            for selected, playing in [('sounds', True), ('thinking', False), ('tts', False),
+                                      (None, False), ('sounds', True)]:
+                state['selected-project'] = {'type': 'local', 'projectId': selected} if selected else None
+                (self.root / '.codex-global-state.json').write_text(json.dumps(state), encoding='utf-8')
+                self.assertEqual(controller.sync_playback(settings), (selected, True))
+                self.assertEqual(controller.active, playing)
+            media.assert_called_once()
+            track.pause.assert_called_once()
+            track.resume.assert_called_once()
+            self.assertEqual(controller.store.load('sounds')[1], 12345)
 
     def test_hotkey_is_canonical_and_requires_a_modifier(self):
         canonical, modifiers, virtual_key = ambient.parse_hotkey('shift + control + alt + m')
@@ -105,6 +156,13 @@ class AmbientTests(unittest.TestCase):
         projects = [{'id': 'new-id', 'name': 'Alpha', 'rootPaths': [r'C:\Work\Alpha']}]
         assignments = {'one': {'projectName': 'Alpha'}, 'two': {'projectName': 'Alpha'}}
         self.assertIsNone(ambient.assignment_for_project('new-id', projects, assignments))
+
+    def test_live_project_assignment_does_not_spill_into_shared_root_or_name(self):
+        projects = [{'id': 'sounds', 'name': 'Sounds', 'rootPaths': [r'C:\Sounds', r'C:\Shared']},
+                    {'id': 'other', 'name': 'Sounds', 'rootPaths': [r'C:\Shared']}]
+        assignment = {'projectName': 'Sounds', 'projectRootPaths': [r'C:\Sounds', r'C:\Shared']}
+        self.assertIs(ambient.assignment_for_project('sounds', projects, {'sounds': assignment}), assignment)
+        self.assertIsNone(ambient.assignment_for_project('other', projects, {'sounds': assignment}))
 
     def test_existing_assignment_is_enriched_during_setup(self):
         projects = [{'id': 'same-id', 'name': 'Alpha', 'rootPaths': [r'C:\Work\Alpha']}]

@@ -129,31 +129,34 @@ def normalized_root(value):
 
 
 def active_project_id(state, projects):
-    """Map the task's active workspace roots to a saved local project."""
+    """Use the current selection; workspace roots can outlive a task switch."""
+    valid_ids = {project['id'] for project in projects}
+    if 'selected-project' in state:
+        selected = state['selected-project']
+        if not isinstance(selected, dict) or selected.get('type') != 'local':
+            return None
+        selected_id = selected.get('projectId')
+        return selected_id if isinstance(selected_id, str) and selected_id in valid_ids else None
+
+    # Older Codex builds did not persist an explicit selection. Only use roots
+    # when the field is absent, never to override an empty or unknown selection.
     active_roots = {root for value in state.get('active-workspace-roots', [])
                     if (root := normalized_root(value))}
     if not active_roots:
         return None
-    matches = []
-    for project in projects:
-        roots = {root for value in project.get('rootPaths', [])
-                 if (root := normalized_root(value))}
-        if active_roots & roots:
-            matches.append(project['id'])
-    selected = state.get('selected-project', {})
-    selected_id = selected.get('projectId') if isinstance(selected, dict) and selected.get('type') == 'local' else None
-    if selected_id in matches:
-        return selected_id
-    if len(matches) == 1:
-        return matches[0]
     projectless = state.get('thread-projectless-output-directories', {})
     if isinstance(projectless, dict):
         projectless_roots = {root for value in projectless.values()
                              if (root := normalized_root(value))}
         if active_roots & projectless_roots:
             return None
-    valid_ids = {project['id'] for project in projects}
-    return selected_id if selected_id in valid_ids else None
+    matches = []
+    for project in projects:
+        roots = {root for value in project.get('rootPaths', [])
+                 if (root := normalized_root(value))}
+        if active_roots & roots:
+            matches.append(project['id'])
+    return matches[0] if len(matches) == 1 else None
 
 
 def project_snapshot(codex_home):
@@ -187,12 +190,15 @@ def assignment_for_project(project_id, projects, assignments):
     project = next((item for item in projects if item.get('id') == project_id), None)
     if not project:
         return None
+    # Identity recovery is only for removed/migrated project IDs. A live
+    # project's assignment must not apply to another project sharing a root.
+    valid_ids = {item['id'] for item in projects}
+    orphaned = [value for key, value in assignments.items()
+                if key not in valid_ids and isinstance(value, dict)]
     roots = {root for value in project.get('rootPaths', [])
              if (root := normalized_root(value))}
     by_root = []
-    for assignment in assignments.values():
-        if not isinstance(assignment, dict):
-            continue
+    for assignment in orphaned:
         saved_roots = {root for value in assignment.get('projectRootPaths', [])
                        if (root := normalized_root(value))}
         if roots & saved_roots:
@@ -201,9 +207,8 @@ def assignment_for_project(project_id, projects, assignments):
         return by_root[0]
     name = project.get('name')
     if isinstance(name, str) and name:
-        by_name = [assignment for assignment in assignments.values()
-                   if isinstance(assignment, dict)
-                   and isinstance(assignment.get('projectName'), str)
+        by_name = [assignment for assignment in orphaned
+                   if isinstance(assignment.get('projectName'), str)
                    and assignment['projectName'].casefold() == name.casefold()]
         if len(by_name) == 1:
             return by_name[0]
@@ -458,6 +463,8 @@ class AmbientController:
         self.index = 0
         self.track = None
         self.active = False
+        self.system_volume = 1.0
+        self.effective_volume = 0.0
         self.last_saved = 0
         self.last_error = None
         self.retry_at = 0
@@ -566,6 +573,8 @@ class AmbientController:
                 'track': self.track.path.name if self.track else None,
                 'codexRunning': bool(codex_running),
                 'muted': settings.get('muted', False),
+                'systemVolume': round(self.system_volume * 100),
+                'effectiveVolume': round(self.effective_volume, 2),
                 'hotkey': settings.get('hotkey', DEFAULT_HOTKEY),
                 'hotkeyRegistered': bool(hotkey and hotkey.registered),
                 'hotkeyError': hotkey.error if hotkey else None,
@@ -581,16 +590,23 @@ class AmbientController:
                        and not settings.get('muted', False) and isinstance(assignment, dict))
         try:
             if should_play:
-                notify.validate_volume(settings.get('volume', 24))
-                self.activate(selected_id, assignment, settings.get('volume', 24))
+                configured_volume = settings.get('volume', 24)
+                notify.validate_volume(configured_volume)
+                self.system_volume = notify.system_volume_scalar()
+                self.effective_volume = notify.effective_volume(
+                    configured_volume, self.system_volume)
+                self.activate(selected_id, assignment, self.effective_volume)
                 self.advance_if_finished()
                 if self.active and time.monotonic() - self.last_saved >= 5:
                     self.save_position()
             elif not codex_running or not plugin_enabled:
+                self.effective_volume = 0.0
                 self.suspend()
             else:
+                self.effective_volume = 0.0
                 self.pause()
         except (OSError, ValueError) as error:
+            self.effective_volume = 0.0
             self.close_track()
             self.last_error = str(error)
             self.retry_at = time.monotonic() + 10
