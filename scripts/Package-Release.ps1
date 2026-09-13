@@ -46,16 +46,24 @@ try {
     $releaseManifest.version = $Version
     $releaseManifest | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $releaseManifestPath -Encoding utf8
 
-    Remove-Item -LiteralPath $archive,$checksum -Force -ErrorAction SilentlyContinue
-    Compress-Archive -LiteralPath $stagingRoot -DestinationPath $archive -CompressionLevel Optimal -Force
-
     Add-Type -AssemblyName System.IO.Compression.FileSystem
+    Remove-Item -LiteralPath $archive,$checksum -Force -ErrorAction SilentlyContinue
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $temporaryRoot,
+        $archive,
+        [System.IO.Compression.CompressionLevel]::Optimal,
+        $false
+    )
+
     $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
     try {
         $entries = @($zip.Entries | ForEach-Object FullName)
         $requiredEntries = @(
             'codex-sounds/.codex-plugin/plugin.json',
             'codex-sounds/bin/codex-sounds/codex-sounds.exe',
+            'codex-sounds/bin/codex-sounds/_internal/_tcl_data/init.tcl',
+            'codex-sounds/bin/codex-sounds/_internal/_tk_data/tk.tcl',
+            'codex-sounds/bin/codex-sounds/_internal/tcl8/8.6/http-2.9.8.tm',
             'codex-sounds/mcp-server.mjs',
             'codex-sounds/node_modules/@modelcontextprotocol/sdk/package.json',
             'codex-sounds/skills/sound-settings/SKILL.md'
@@ -63,6 +71,12 @@ try {
         foreach ($entry in $requiredEntries) {
             if ($entries -notcontains $entry) { throw "Release archive is missing: $entry" }
         }
+        $tclDataCount = @($entries | Where-Object { $_ -like 'codex-sounds/bin/codex-sounds/_internal/_tcl_data/*' -and -not $_.EndsWith('/') }).Count
+        $tkDataCount = @($entries | Where-Object { $_ -like 'codex-sounds/bin/codex-sounds/_internal/_tk_data/*' -and -not $_.EndsWith('/') }).Count
+        $tclModuleCount = @($entries | Where-Object { $_ -like 'codex-sounds/bin/codex-sounds/_internal/tcl8/*' -and -not $_.EndsWith('/') }).Count
+        if ($tclDataCount -lt 800) { throw "Release archive contains only $tclDataCount Tcl runtime files." }
+        if ($tkDataCount -lt 80) { throw "Release archive contains only $tkDataCount Tk runtime files." }
+        if ($tclModuleCount -lt 5) { throw "Release archive contains only $tclModuleCount Tcl module files." }
         if ($entries | Where-Object { $_ -match '(?:^|/)(?:sounds|ambient|web-session|last-event)\.json$|rotation\.sqlite$' }) {
             throw 'Release archive contains workstation settings.'
         }

@@ -31,6 +31,7 @@ try {
   assert.deepEqual(openTool.inputSchema.properties, {});
   const resource = await client.readResource({ uri: openTool._meta.ui.resourceUri });
   assert.match(resource.contents[0].text, /const appMode=true;/);
+  assert.match(resource.contents[0].text, /notifyIntrinsicHeight/);
   assert.match(resource.contents[0].text, /sound_settings_request/);
   const opened = await client.callTool({ name: "open_sound_settings", arguments: {} });
   assert.equal(opened.structuredContent.opened, false);
