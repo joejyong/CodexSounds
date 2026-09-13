@@ -3,7 +3,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $pluginRoot = Split-Path -Parent $PSScriptRoot
-$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('codex-sounds-build-' + [Guid]::NewGuid().ToString('N'))
+$temporaryRoot = Join-Path $pluginRoot ('work\release-build-' + [Guid]::NewGuid().ToString('N'))
 $distribution = Join-Path $temporaryRoot 'dist'
 $work = Join-Path $temporaryRoot 'work'
 $spec = Join-Path $temporaryRoot 'spec'
