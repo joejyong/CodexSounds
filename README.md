@@ -14,7 +14,7 @@ Download the ready-to-install [latest Windows x64 ZIP](https://github.com/joejyo
 
 Codex Sounds registers an app-only task entrypoint named **Codex Sounds**. Codex lists it in the right panel's New tab menu. Selecting it opens the complete settings page through the plugin's MCP server. It does not send a prompt, start an agent turn, or use model tokens.
 
-The panel calls a small set of app-only MCP tools. Those tools proxy requests to the existing loopback settings service. The browser never receives the service's access token. The same page still works through the agent-opened browser route for compatibility.
+The panel completes the MCP Apps initialization handshake before loading settings, then reports size changes through the standard MCP Apps notification. The panel calls a small set of app-only MCP tools. Those tools proxy requests to the existing loopback settings service. The browser never receives the service's access token. The same page still works through the agent-opened browser route for compatibility.
 
 After installing a build that adds or changes MCP tools, fully quit and reopen Codex so the desktop app refreshes its plugin catalog.
 
@@ -77,8 +77,8 @@ Rebuild the bundled Windows helper after changing Python or HTML source:
 Create a release by making sure the manifest and `package.json` use the intended version, then push a matching tag:
 
 ```powershell
-git tag v1.3.3
-git push origin v1.3.3
+git tag v1.3.4
+git push origin v1.3.4
 ```
 
 The Windows workflow runs every test, rebuilds the bundled helper, packages the plugin with its Node dependencies, verifies that the Tcl/Tk runtime is complete, writes a SHA-256 checksum, and publishes both files on GitHub Releases. Keep the ZIP asset name unchanged so the latest-download link remains valid.
