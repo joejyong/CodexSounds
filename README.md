@@ -6,6 +6,10 @@ Only completed replies in user tasks play sounds. Internal subagent completions 
 
 Install the plugin in Codex, then ask **Set up reply sounds on this workstation**. After setup, fully quit and reopen Codex if requested. Open the right panel's New tab menu and choose **Codex Sounds** to load the controls without starting an agent turn. Asking **Open my sound settings in Codex** remains available as a fallback.
 
+## Download
+
+Download the ready-to-install [latest Windows x64 ZIP](https://github.com/joejyong/CodexSounds/releases/latest/download/codex-sounds-windows-x64.zip), or open the [latest release page](https://github.com/joejyong/CodexSounds/releases/latest) for its notes and SHA-256 checksum. Extract the ZIP before installing the contained `codex-sounds` folder in Codex.
+
 ## Right-panel settings
 
 Codex Sounds registers an app-only task entrypoint named **Codex Sounds**. Codex lists it in the right panel's New tab menu. Selecting it opens the complete settings page through the plugin's MCP server. It does not send a prompt, start an agent turn, or use model tokens.
@@ -34,7 +38,7 @@ Assignments also record the project name and root folders. If Codex changes a lo
 
 ## Another workstation
 
-Use the plugin's Share action in Codex, or clone this repository on the other workstation and run `npm ci` in the plugin folder before installing it. Run setup on that workstation. Custom sound files are not included. Copy your own clips separately and choose their new location in settings.
+Use the plugin's Share action in Codex, or download and extract the [latest release ZIP](https://github.com/joejyong/CodexSounds/releases/latest/download/codex-sounds-windows-x64.zip). The release already contains the Node runtime dependencies needed by the right-panel settings entry. If you clone the source repository instead, run `npm ci` in the plugin folder before installing it. Run setup on that workstation. Custom sound files are not included. Copy your own clips separately and choose their new location in settings.
 
 ## Turning it off
 
@@ -69,3 +73,12 @@ Rebuild the bundled Windows helper after changing Python or HTML source:
 ```powershell
 .\scripts\Build-Plugin.ps1
 ```
+
+Create a release by making sure the manifest and `package.json` use the intended version, then push a matching tag:
+
+```powershell
+git tag v1.3.1
+git push origin v1.3.1
+```
+
+The Windows workflow runs every test, rebuilds the bundled helper, packages the plugin with its Node dependencies, writes a SHA-256 checksum, and publishes both files on GitHub Releases. Keep the ZIP asset name unchanged so the latest-download link remains valid.
