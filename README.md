@@ -32,7 +32,7 @@ The importer calls the maintained `yt-dlp` and FFmpeg command-line tools. They a
 
 Assign one WAV or MP3 track, or a folder playlist, to each saved local Codex project from the same settings panel. A track loops. A folder plays in filename order and starts again after the final file. The player keeps going when you move into Unreal Engine, a browser, or another Windows app. Opening a standalone task or GPT conversation pauses it. Returning to the project resumes the saved track and position. Closing Codex saves the position and releases the Windows media handle.
 
-Project soundscapes have a separate master switch, manual mute, volume, and configurable global mute shortcut. The default shortcut is `Ctrl+Alt+Shift+M`. It affects ambient audio only, so reply notifications still play. Both the ambient and notification volume settings are multiplied by the current Windows master output volume, including its mute state. Enabling soundscapes creates a per-user Windows startup shortcut for one single-instance controller. The controller remains dormant when Codex is closed so it can detect the next launch, but it holds no media track or audio device. Setup removes orphaned controllers left by older installations. Disabling soundscapes removes the shortcut and stops the controller. Spotify and remote streaming playback are not supported.
+Project soundscapes have a separate master switch, manual mute, volume, and configurable global mute shortcut. The default shortcut is `Ctrl+Alt+Shift+M`. It affects ambient audio only, so reply notifications still play. Both the ambient and notification volume settings are multiplied by the current Windows master output volume, including its mute state. Enabling soundscapes creates a per-user Windows startup shortcut for one single-instance controller. Whenever Codex starts, the plugin asks Windows to restore that controller outside Codex's process tree. This lets playback survive short-lived plugin processes while Codex loads the selected project. The controller remains dormant when Codex is closed and holds no media track or audio device. Setup removes orphaned controllers left by older installations. Disabling soundscapes removes the shortcut and stops the controller. Spotify and remote streaming playback are not supported.
 
 Soundscapes follow Codex's explicit project selection. Older saved workspace roots cannot override a switch to another project or a standalone conversation. Projects without an assignment stay silent.
 
@@ -79,8 +79,8 @@ Rebuild the bundled Windows helper after changing Python or HTML source:
 Create a release by making sure the manifest and `package.json` use the intended version, then push a matching tag:
 
 ```powershell
-git tag v1.3.5
-git push origin v1.3.5
+git tag v1.3.6
+git push origin v1.3.6
 ```
 
 The Windows workflow runs every test, rebuilds the bundled helper, packages the plugin with its Node dependencies, verifies that the Tcl/Tk runtime is complete, writes a SHA-256 checksum, and publishes both files on GitHub Releases. Keep the ZIP asset name unchanged so the latest-download link remains valid.

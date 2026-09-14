@@ -4,10 +4,45 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createContext, Script } from "node:vm";
+import { EventEmitter } from "node:events";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { restoreAmbientPlayback } from "../src/ambient-startup.mjs";
 
 const isolatedHome = await mkdtemp(join(tmpdir(), "codex-sounds-panel-"));
+const launches = [];
+const fakeChild = new EventEmitter();
+fakeChild.kill = () => {};
+assert.equal(await restoreAmbientPlayback("C:\\Codex", "C:\\plugin\\codex-sounds.exe", {
+  readFile: async () => JSON.stringify({ enabled: true }),
+  env: { SystemRoot: "C:\\Windows", PRESERVED: "yes" },
+  spawn(command, args, options) {
+    launches.push({ command, args, options });
+    queueMicrotask(() => fakeChild.emit("exit", 0));
+    return fakeChild;
+  },
+}), true);
+assert.equal(launches.length, 1);
+assert.equal(launches[0].command,
+  "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
+assert.deepEqual(launches[0].args.slice(0, 4),
+  ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand"]);
+assert.match(Buffer.from(launches[0].args[4], "base64").toString("utf16le"),
+  /Invoke-CimMethod -ClassName Win32_Process -MethodName Create/);
+assert.deepEqual(launches[0].options, {
+  windowsHide: true,
+  stdio: "ignore",
+  env: {
+    SystemRoot: "C:\\Windows",
+    PRESERVED: "yes",
+    CODEX_SOUNDS_AMBIENT_EXE: "C:\\plugin\\codex-sounds.exe",
+    CODEX_SOUNDS_AMBIENT_HOME: "C:\\Codex",
+  },
+});
+assert.equal(await restoreAmbientPlayback("C:\\Codex", "unused.exe", {
+  readFile: async () => JSON.stringify({ enabled: false }),
+  spawn() { throw new Error("Disabled soundscapes must not start the player."); },
+}), false);
 const client = new Client({ name: "codex-sounds-panel-test", version: "1.0.0" });
 const transport = new StdioClientTransport({
   command: process.execPath,
