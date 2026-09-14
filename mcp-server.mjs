@@ -147,7 +147,7 @@ async function settingsRequest(path, body) {
 }
 
 const server = new McpServer(
-  { name: "codex-sounds", version: "1.3.7", icons: serverIcons },
+  { name: "codex-sounds", version: "1.3.8", icons: serverIcons },
   { capabilities: { tools: {}, resources: {} } },
 );
 

@@ -251,7 +251,7 @@ def install(codex_home, bundle=None, shortcut=False):
             (data / 'forward-command.json').unlink(missing_ok=True)
         raise
     plugin_ids = [key for key in tomlkit.parse(original.decode('utf-8-sig')).get('plugins', {}) if key.split('@')[0] == 'codex-sounds']
-    atomic_json(data / 'plugin-install.json', {'version': '1.3.7', 'executable': str(executable),
+    atomic_json(data / 'plugin-install.json', {'version': '1.3.8', 'executable': str(executable),
                 'pluginIds': plugin_ids or ['codex-sounds@personal'],
                 'restoreCommand': base, 'installedCommand': configured})
     warnings = []
