@@ -22,7 +22,8 @@ PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 TH32CS_SNAPPROCESS = 0x00000002
 INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 MAX_PROCESS_PATH = 32768
-DEFAULT_HOTKEY = 'Ctrl+Alt+Shift+M'
+DEFAULT_HOTKEY = 'Ctrl+Alt+P'
+LEGACY_DEFAULT_HOTKEYS = {'Ctrl+Alt+Shift+M'}
 HOTKEY_ID = 0x4353
 WM_HOTKEY = 0x0312
 PM_REMOVE = 0x0001
@@ -84,6 +85,12 @@ def read_json(path, default=None):
 def default_settings():
     return {'enabled': False, 'muted': False, 'hotkey': DEFAULT_HOTKEY,
             'volume': 24, 'assignments': {}}
+
+
+def migrate_default_hotkey(value):
+    if not value or value in LEGACY_DEFAULT_HOTKEYS:
+        return DEFAULT_HOTKEY
+    return value
 
 
 def load_settings():

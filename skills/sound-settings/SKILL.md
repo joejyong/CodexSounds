@@ -32,7 +32,7 @@ The URL contains a local access token. Use it to open the panel, but do not put 
 - `Setup` is safe to repeat, preserves existing preferences and rotation state, and returns `restartRequired`. If true, ask the user to fully quit and reopen Codex after the work is done. Do not restart the app during active work.
 - `Mute` and `Unmute` apply immediately. Use these for the corresponding requests.
 - `AmbientOn` and `AmbientOff` control project soundscapes without changing reply notifications. Enabling starts the background controller and creates a per-user startup shortcut. Disabling stops it and removes that shortcut.
-- `AmbientMute`, `AmbientUnmute`, and `AmbientToggle` change the persistent manual mute state. The configured global shortcut does the same thing without opening Codex. Its default is `Ctrl+Alt+Shift+M`.
+- `AmbientMute`, `AmbientUnmute`, and `AmbientToggle` change the persistent manual mute state. The configured global shortcut does the same thing without opening Codex. Its default is `Ctrl+Alt+P`.
 - `Disconnect` restores other notification callbacks and preserves sound preferences. Use it before removing the plugin if the user asks to uninstall this integration. Then use Codex's plugin uninstall tool. Do not delete the user's sound folder.
 - After copying/installing the plugin on another workstation, run `Setup` there. Do not copy this workstation's configuration, callback paths, sound files, or logs unless the user explicitly requests them.
 

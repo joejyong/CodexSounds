@@ -119,12 +119,18 @@ class AmbientTests(unittest.TestCase):
             self.assertEqual(controller.store.load('sounds')[1], 12345)
 
     def test_hotkey_is_canonical_and_requires_a_modifier(self):
-        canonical, modifiers, virtual_key = ambient.parse_hotkey('shift + control + alt + m')
+        canonical, modifiers, virtual_key = ambient.parse_hotkey('alt + control + p')
         self.assertEqual(canonical, ambient.DEFAULT_HOTKEY)
-        self.assertEqual(virtual_key, ord('M'))
+        self.assertEqual(virtual_key, ord('P'))
         self.assertTrue(modifiers & ambient.MOD_NOREPEAT)
         with self.assertRaises(ValueError):
             ambient.parse_hotkey('M')
+
+    def test_old_default_hotkey_is_migrated_without_changing_custom_hotkeys(self):
+        self.assertEqual(ambient.migrate_default_hotkey('Ctrl+Alt+Shift+M'),
+                         ambient.DEFAULT_HOTKEY)
+        self.assertEqual(ambient.migrate_default_hotkey(None), ambient.DEFAULT_HOTKEY)
+        self.assertEqual(ambient.migrate_default_hotkey('Ctrl+Shift+P'), 'Ctrl+Shift+P')
 
     def test_settings_candidate_preserves_manual_mute_and_canonicalizes_hotkey(self):
         result = web_settings.ambient_candidate({

@@ -12,6 +12,7 @@ import time
 import uuid
 
 import tomlkit
+import ambient
 import notify
 
 
@@ -233,8 +234,7 @@ def install(codex_home, bundle=None, shortcut=False):
     if not isinstance(ambient_settings, dict):
         ambient_settings = {'enabled': False, 'volume': 24, 'assignments': {}}
     ambient_settings.setdefault('muted', False)
-    ambient_settings.setdefault('hotkey', 'Ctrl+Alt+Shift+M')
-    import ambient
+    ambient_settings['hotkey'] = ambient.migrate_default_hotkey(ambient_settings.get('hotkey'))
     projects, _ = ambient.project_snapshot(codex_home)
     ambient_settings['assignments'] = ambient.enrich_assignment_identities(
         ambient_settings.get('assignments', {}), projects)
@@ -281,7 +281,7 @@ def disconnect(codex_home):
     settings['enabled'] = False
     atomic_json(data / 'sounds.json', settings)
     ambient_settings = read_json(data / 'ambient.json', {'enabled': False, 'muted': False,
-                                 'hotkey': 'Ctrl+Alt+Shift+M', 'volume': 24, 'assignments': {}})
+                                 'hotkey': ambient.DEFAULT_HOTKEY, 'volume': 24, 'assignments': {}})
     ambient_settings['enabled'] = False
     atomic_json(data / 'ambient.json', ambient_settings)
     installation = read_json(data / 'plugin-install.json', {})
@@ -300,7 +300,7 @@ def status(codex_home):
             'lastEvent': read_json(data / 'last-event.json'),
             'ambientEnabled': ambient_settings.get('enabled', False),
             'ambientMuted': ambient_settings.get('muted', False),
-            'ambientHotkey': ambient_settings.get('hotkey', 'Ctrl+Alt+Shift+M'),
+            'ambientHotkey': ambient_settings.get('hotkey', ambient.DEFAULT_HOTKEY),
             'ambientAssignments': len(ambient_settings.get('assignments', {})),
             'ambientStatus': read_json(data / 'ambient-status.json')}
 

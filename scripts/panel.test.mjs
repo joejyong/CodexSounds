@@ -143,7 +143,7 @@ try {
       assignments: {},
       enabled: false,
       muted: false,
-      hotkey: "Ctrl+Alt+Shift+M",
+      hotkey: "Ctrl+Alt+P",
       volume: 24,
       status: {},
     },
