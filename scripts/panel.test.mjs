@@ -7,12 +7,37 @@ import { createContext, Script } from "node:vm";
 import { EventEmitter } from "node:events";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { restoreAmbientPlayback } from "../src/ambient-startup.mjs";
+import { refreshInstalledHelper, restoreAmbientPlayback } from "../src/ambient-startup.mjs";
 
 const isolatedHome = await mkdtemp(join(tmpdir(), "codex-sounds-panel-"));
 const launches = [];
 const fakeChild = new EventEmitter();
 fakeChild.kill = () => {};
+let setupCalls = 0;
+const installedPath = "C:\\Codex\\notification-sounds\\plugin-install.json";
+const oldHelper = "C:\\installed\\codex-sounds.exe";
+assert.equal(await refreshInstalledHelper("C:\\Codex", "C:\\plugin\\codex-sounds.exe",
+  async () => { setupCalls += 1; }, {
+    async readFile(path) {
+      if (path === installedPath) return JSON.stringify({ executable: oldHelper });
+      if (path === oldHelper) return Buffer.from("old helper");
+      return Buffer.from("current helper");
+    },
+  }), true);
+assert.equal(setupCalls, 1);
+assert.equal(await refreshInstalledHelper("C:\\Codex", "C:\\plugin\\codex-sounds.exe",
+  async () => { setupCalls += 1; }, {
+    async readFile(path) {
+      if (path === installedPath) return JSON.stringify({ executable: oldHelper });
+      return Buffer.from("same helper");
+    },
+  }), false);
+assert.equal(setupCalls, 1);
+assert.equal(await refreshInstalledHelper("C:\\NewCodex", "C:\\plugin\\codex-sounds.exe",
+  async () => { setupCalls += 1; }, {
+    async readFile() { throw new Error("Not configured"); },
+  }), false);
+assert.equal(setupCalls, 1);
 assert.equal(await restoreAmbientPlayback("C:\\Codex", "C:\\plugin\\codex-sounds.exe", {
   readFile: async () => JSON.stringify({ enabled: true }),
   env: { SystemRoot: "C:\\Windows", PRESERVED: "yes" },

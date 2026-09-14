@@ -79,8 +79,8 @@ Rebuild the bundled Windows helper after changing Python or HTML source:
 Create a release by making sure the manifest and `package.json` use the intended version, then push a matching tag:
 
 ```powershell
-git tag v1.3.6
-git push origin v1.3.6
+git tag v1.3.7
+git push origin v1.3.7
 ```
 
 The Windows workflow runs every test, rebuilds the bundled helper, packages the plugin with its Node dependencies, verifies that the Tcl/Tk runtime is complete, writes a SHA-256 checksum, and publishes both files on GitHub Releases. Keep the ZIP asset name unchanged so the latest-download link remains valid.

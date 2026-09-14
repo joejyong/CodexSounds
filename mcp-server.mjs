@@ -12,7 +12,7 @@ import {
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod/v3";
-import { restoreAmbientPlayback } from "./src/ambient-startup.mjs";
+import { refreshInstalledHelper, restoreAmbientPlayback } from "./src/ambient-startup.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)));
 const SETTINGS_URI = "ui://codex-sounds/settings-v1.html";
@@ -147,7 +147,7 @@ async function settingsRequest(path, body) {
 }
 
 const server = new McpServer(
-  { name: "codex-sounds", version: "1.3.6", icons: serverIcons },
+  { name: "codex-sounds", version: "1.3.7", icons: serverIcons },
   { capabilities: { tools: {}, resources: {} } },
 );
 
@@ -207,4 +207,5 @@ registerAppTool(server, "sound_settings_request", {
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
-void restoreAmbientPlayback(CODEX_HOME, HELPER);
+void refreshInstalledHelper(CODEX_HOME, HELPER, () => runHelper("setup"))
+  .then(refreshed => refreshed || restoreAmbientPlayback(CODEX_HOME, HELPER));

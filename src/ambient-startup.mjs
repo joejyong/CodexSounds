@@ -2,6 +2,24 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
+export async function refreshInstalledHelper(codexHome, helper, setup, dependencies = {}) {
+  const read = dependencies.readFile || readFile;
+  try {
+    const installationPath = join(codexHome, "notification-sounds", "plugin-install.json");
+    const installation = JSON.parse(await read(installationPath, "utf8"));
+    if (typeof installation?.executable !== "string" || !installation.executable) return false;
+    const [bundled, installed] = await Promise.all([
+      read(helper),
+      read(installation.executable),
+    ]);
+    if (Buffer.compare(bundled, installed) === 0) return false;
+    await setup();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const brokerScript = `$executable = $env:CODEX_SOUNDS_AMBIENT_EXE
 $codexHome = $env:CODEX_SOUNDS_AMBIENT_HOME
 if ([string]::IsNullOrWhiteSpace($executable) -or

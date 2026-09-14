@@ -57,7 +57,7 @@ try {
 
     $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
     try {
-        $entries = @($zip.Entries | ForEach-Object FullName)
+        $entries = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
         $requiredEntries = @(
             'codex-sounds/.codex-plugin/plugin.json',
             'codex-sounds/bin/codex-sounds/codex-sounds.exe',
